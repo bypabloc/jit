@@ -1,0 +1,17 @@
+# [Tema o componente] Resumen de una línea del cambio (50 caracteres como máximo)
+
+# Más detalles sobre el cambio, explicando la motivación, enfoque y efectos
+# (envuelve el texto a ~72 caracteres por línea)
+#
+# - Usa una lista con viñetas si es necesario
+# - Explica cualquier cambio importante en la implementación o diseño
+# - Menciona cualquier problema que se haya resuelto o mejorado
+#
+# Enlace a issue/ticket en el sistema de seguimiento de problemas (si corresponde)
+# Ejemplo: Resuelve: #123, Relacionado con: #456
+#
+# <tipo>(<alcance>): <asunto>
+# <BLANK LINE>
+# <cuerpo>
+# <BLANK LINE>
+# <pie>
