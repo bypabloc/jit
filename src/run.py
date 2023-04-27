@@ -88,7 +88,7 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        logger.warning("Saliendo...")
+        logger.warning("Saliendo... Por petición del usuario.")
         sys_exit(0)
     except Exception:
         logger.error('Se encontró un error:', extra=format_exc())

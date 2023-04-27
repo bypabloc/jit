@@ -84,18 +84,20 @@ class Logger:
             for line in lines[start:end]:
                 print(line.strip())
 
-            if page == total_pages:
-                if page == 1:
-                    print("\nReached the last page. Press any key to exit.")
-                else:
-                    print("\nReached the last page. Type 'p' for the previous page, or any other key to exit.")
-            else:
-                print("\nType 'n' for the next page, 'p' for the previous page, or any other key to exit.")
+            print("\nType 'n' for the next page, 'p' for the previous page,")
+            print("a number to go to that specific page, or any other key to exit.")
 
-            key = input().lower()
-            if key == 'n' and page < total_pages:
+            key = input().strip()
+
+            if key.isdigit():
+                key = int(key)
+                if 1 <= key <= total_pages:
+                    self.print_logs(key, page_size)
+                else:
+                    print("Invalid page number. Exiting.")
+            elif key.lower() == 'n' and page < total_pages:
                 page += 1
                 self.print_logs(page, page_size)
-            elif key == 'p' and page > 1:
+            elif key.lower() == 'p' and page > 1:
                 page -= 1
                 self.print_logs(page, page_size)
