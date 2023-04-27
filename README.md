@@ -1,6 +1,5 @@
 ### Name Project:
-JIT: Jest in time
-"JestInTime": un juego de palabras entre "just in time" (justo a tiempo) y "jest" (broma), sugiriendo que la librería proporciona soluciones oportunas y cómicas.
+PCE: Pablo Command Easy
 
 
 # Dev
