@@ -24,8 +24,9 @@ class Logger:
 
     def _log(self, message_type: str, color: str, message: str, extra: dict = {}):
         datetime_str = datetime.datetime.now().strftime(self.datetime_format)
-        extra_str = ' '.join([f"{key}={value}" for key, value in extra.items()])
-        log_entry = f"{ConsoleColor.BOLD}{datetime_str}{ConsoleColor.END} {color}[{message_type}]{ConsoleColor.END} {message} {extra_str}"
+        log_entry = f"{ConsoleColor.BOLD}{datetime_str}{ConsoleColor.END} {color}[{message_type}]{ConsoleColor.END} {message}"
+        if extra:
+            log_entry += f" {extra}"
 
         print(log_entry)
 

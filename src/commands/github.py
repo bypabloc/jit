@@ -1,15 +1,13 @@
-class GitHubController:
-    def __init__(self, bot):
-        self.bot = bot
+from settings.logger import logger
 
-    def execute(self, command):
-        if command == "issues":
-            return self.issues()
-        elif command == "pulls":
-            return self.pulls()
-        elif command == "repos":
-            return self.repos()
-        elif command == "help":
-            return self.help()
-        else:
-            return self.help()
+
+class GitHubController:
+    args = None
+
+    def __init__(self, args: dict):
+        self.args = args
+
+    def execute(self):
+        logger.info("Ejecutando comando 'github'.")
+        logger.info(f"Argumentos: {self.args}")
+        logger.info("Fin de la ejecución del comando 'github'.")
