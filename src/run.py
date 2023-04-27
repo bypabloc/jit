@@ -1,5 +1,7 @@
-import re
 from argparse import ArgumentParser as argparse_ArgumentParser
+from re import match as re_match
+from sys import exit as sys_exit
+from sys import stderr as sys_stderr
 
 from inquirer import Text as inquirer_Text
 from inquirer import prompt as inquirer_prompt
@@ -12,8 +14,15 @@ from inquirer import prompt as inquirer_prompt
 # https://github.com/magmax/python-inquirer
 
 
+class CustomArgumentParser(argparse_ArgumentParser):
+    def error(self, message):
+        sys_stderr.write(f"Error: {message}\n")
+        self.print_help()
+        sys_exit(2)
+
+
 def main():
-    parser = argparse_ArgumentParser(
+    parser = CustomArgumentParser(
         description="Ejemplo de captura de variables por comandos",
     )
 
@@ -30,7 +39,13 @@ def main():
         help="Apellido de la persona",
     )
 
-    args = parser.parse_args()
+    try:
+        args = parser.parse_args()
+    except SystemExit as e:
+        # En este punto, puedes manejar el error de la forma que desees.
+        # Por ejemplo, puedes registrar el error o enviar una notificación.
+        print("Se encontró un error al procesar los argumentos.")
+        sys_exit(e.code)
 
     print(f"Nombre: {args.name}")
     print(f"Apellido: {args.lastname}")
@@ -44,7 +59,7 @@ def main():
         inquirer_Text(
             "phone",
             message="What's your phone number",
-            validate=lambda _, x: re.match("\+?\d[\d ]+\d", x),
+            validate=lambda _, x: re_match("\+?\d[\d ]+\d", x),
         ),
     ]
     answers = inquirer_prompt(questions)
