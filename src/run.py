@@ -43,8 +43,6 @@ def main():
         print("Se encontró un error al procesar los argumentos.")
         sys_exit(e.code)
 
-    
-
     modules = import_all_modules_from_folder("src/commands")
 
     command = args.command
