@@ -5,6 +5,8 @@ from sys import stderr as sys_stderr
 
 from inquirer import Text as inquirer_Text
 from inquirer import prompt as inquirer_prompt
+from settings.logger import logger
+from utils.import_all_modules_from_folder import import_all_modules_from_folder
 
 # argparse
 # https://docs.python.org/3/library/argparse.html
@@ -41,22 +43,32 @@ def main():
         print("Se encontró un error al procesar los argumentos.")
         sys_exit(e.code)
 
-    print(f"command: {args.command}")
+    
 
-    questions = [
-        inquirer_Text(
-            "name",
-            message="What's your name",
-        ),
-        inquirer_Text("surname", message="What's your surname"),
-        inquirer_Text(
-            "phone",
-            message="What's your phone number",
-            validate=lambda _, x: re_match("\+?\d[\d ]+\d", x),
-        ),
-    ]
-    answers = inquirer_prompt(questions)
-    print(answers)
+    modules = import_all_modules_from_folder("src/commands")
+
+    command = args.command
+
+    if command not in modules:
+        logger.info(f"El comando '{command}' no existe.")
+        sys_exit(1)
+
+    logger.print_logs()
+
+    # questions = [
+    #     inquirer_Text(
+    #         "name",
+    #         message="What's your name",
+    #     ),
+    #     inquirer_Text("surname", message="What's your surname"),
+    #     inquirer_Text(
+    #         "phone",
+    #         message="What's your phone number",
+    #         validate=lambda _, x: re_match("\+?\d[\d ]+\d", x),
+    #     ),
+    # ]
+    # answers = inquirer_prompt(questions)
+    # print(answers)
 
 
 if __name__ == "__main__":

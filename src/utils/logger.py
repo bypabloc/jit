@@ -1,227 +1,97 @@
-from os import system as os_system
-
-from json import dumps as json_dumps
-from datetime import datetime
+import datetime
+import os
 
 
-__version__ = '4.0.0'
-
-# ==============================================================================
-# CONFIGURACIONES DE COLORES SOLO CON MODO DEBUG
-# ==============================================================================
-GRAY = '\033[90m'
-RED = '\033[91m'
-RED_BOLD = '\033[1m\033[91m'
-GREEN = '\033[92m'
-YELLOW = '\033[93m'
-BLUE = '\033[94m'
-PURPLE = '\033[95m'
-CYAN = '\033[96m'
-WHITE = '\033[97m'
-END = '\033[0m'
-BOLD = '\033[1m'
-UNDERLINE = '\033[4m'
-
-LEVEL = {
-    'SPAM': GRAY,
-    'ERROR': RED,
-    'CRITICAL': RED_BOLD,
-    'SUCCESS': GREEN,
-    'DEBUG': GREEN,
-    'WARNING': YELLOW,
-    'VERBOSE': BLUE,
-    'NOTICE': PURPLE,
-    'HEADER': CYAN,
-    'INFO': WHITE
-}
+class ConsoleColor:
+    GRAY = '\033[90m'
+    RED = '\033[91m'
+    RED_BOLD = '\033[1m\033[91m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    BLUE = '\033[94m'
+    PURPLE = '\033[95m'
+    CYAN = '\033[96m'
+    WHITE = '\033[97m'
+    END = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
 
 
-class Logger(object):
-    """
-    Clase constructura de logs estandarizados.
+class Logger:
+    def __init__(self, filename: str = None):
+        self.datetime_format = '%Y-%m-%d %H:%M:%S'
+        self.filename = filename + '.log' if filename else None
 
-    Attributes
-    ----------
-    debug : bool
-        Indica si el log debe ejecutarse en modo debug. True en caso positivo y False en caso
-        contrario
+    def _log(self, message_type: str, color: str, message: str, extra: dict = {}):
+        datetime_str = datetime.datetime.now().strftime(self.datetime_format)
+        extra_str = ' '.join([f"{key}={value}" for key, value in extra.items()])
+        log_entry = f"{ConsoleColor.BOLD}{datetime_str}{ConsoleColor.END} {color}[{message_type}]{ConsoleColor.END} {message} {extra_str}"
 
-    :Authors:
-        - Pablo Contreras
+        print(log_entry)
 
-    :Created:
-        - 2022-12-24
-    """
-    debug = False
+        if self.filename:
+            with open(self.filename, 'a') as f:
+                f.write(log_entry + os.linesep)
 
-    def clean(self):
-        """
-        Limpia la consola
+    def spam(self, message: str, extra: dict = {}):
+        self._log('SPAM', ConsoleColor.GRAY, message, extra)
 
-        :Authors:
-            - Pablo Contreras
+    def error(self, message: str, extra: dict = {}):
+        self._log('ERROR', ConsoleColor.RED, message, extra)
 
-        :Created:
-            - 2022-12-24
-        """
-        os_system('clear')
+    def critical(self, message: str, extra: dict = {}):
+        self._log('CRITICAL', ConsoleColor.RED_BOLD, message, extra)
 
-    def info(self, message, traceback=None, extra={}):
-        """
-        Crea un log de tipo INFO
+    def success(self, message: str, extra: dict = {}):
+        self._log('SUCCESS', ConsoleColor.GREEN, message, extra)
 
-        Parameters
-        ----------
-        message : str
-            Texto a imprimir como log
-        traceback : str
-            Texto correspondiente al traceback
-        extra : dict
-            Diccionario de variables que se quieren imprimir en el log
+    def debug(self, message: str, extra: dict = {}):
+        self._log('DEBUG', ConsoleColor.GREEN, message, extra)
 
-        :Authors:
-            - Pablo Contreras
+    def warning(self, message: str, extra: dict = {}):
+        self._log('WARNING', ConsoleColor.YELLOW, message, extra)
 
-        :Created:
-            - 2022-12-24
-        """
-        self.default('INFO', message, traceback, extra)
+    def verbose(self, message: str, extra: dict = {}):
+        self._log('VERBOSE', ConsoleColor.BLUE, message, extra)
 
-    def success(self, message, traceback=None, extra={}):
-        """
-        Crea un log de tipo SUCCESS
+    def notice(self, message: str, extra: dict = {}):
+        self._log('NOTICE', ConsoleColor.PURPLE, message, extra)
 
-        Parameters
-        ----------
-        message : str
-            Texto a imprimir como log
-        traceback : str
-            Texto correspondiente al traceback
-        extra : dict
-            Diccionario de variables que se quieren imprimir en el log
+    def header(self, message: str, extra: dict = {}):
+        self._log('HEADER', ConsoleColor.CYAN, message, extra)
 
-        :Authors:
-            - Pablo Contreras
+    def info(self, message: str, extra: dict = {}):
+        self._log('INFO', ConsoleColor.WHITE, message, extra)
 
-        :Created:
-            - 2022-12-24
-        """
-        self.default('SUCCESS', message, traceback, extra)
+    def print_logs(self, page=1, page_size=10):
+        if not self.filename:
+            print("No log file specified.")
+            return
 
-    def warn(self, message, traceback=None, extra={}):
-        """
-        Crea un log de tipo WARNING
+        if not os.path.exists(self.filename):
+            print("Log file does not exist.")
+            return
 
-        Parameters
-        ----------
-        message : str
-            Texto a imprimir como log
-        traceback : str
-            Texto correspondiente al traceback
-        extra : dict
-            Diccionario de variables que se quieren imprimir en el log
+        with open(self.filename, 'r') as f:
+            lines = f.readlines()
+            total_pages = (len(lines) + page_size - 1) // page_size
+            start = len(lines) - page_size * (page)
+            end = start + page_size
 
-        :Authors:
-            - Pablo Contreras
+            print(f"Showing logs from page {page} of {total_pages}:\n")
 
-        :Created:
-            - 2022-12-24
-        """
-        self.default('WARNING', message, traceback, extra)
+            for line in lines[start:end]:
+                print(line.strip())
 
-    def error(self, message, traceback=None, extra={}):
-        """
-        Crea un log de tipo ERROR
+            print("\nType 'n' for the next page, 'p' for the previous page, or any other key to exit.")
 
-        Parameters
-        ----------
-        message : str
-            Texto a imprimir como log
-        traceback : str
-            Texto correspondiente al traceback
-        extra : dict
-            Diccionario de variables que se quieren imprimir en el log
-
-        :Authors:
-            - Pablo Contreras
-
-        :Created:
-            - 2022-12-24
-        """
-        self.default('ERROR', message, traceback, extra)
-
-    def critical(self, message, traceback=None, extra={}):
-        """
-        Crea un log de tipo CRITICAL
-
-        Parameters
-        ----------
-        message : str
-            Texto a imprimir como log
-        traceback : str
-            Texto correspondiente al traceback
-        extra : dict
-            Diccionario de variables que se quieren imprimir en el log
-
-        :Authors:
-            - Pablo Contreras
-
-        :Created:
-            - 2022-12-24
-        """
-        self.default('CRITICAL', message, traceback, extra)
-
-    def debugger(self, message, traceback=None, extra={}):
-        """
-        Crea un log de tipo DEBUG
-
-        Parameters
-        ----------
-        message : str
-            Texto a imprimir como log
-        traceback : str
-            Texto correspondiente al traceback
-        extra : dict
-            Diccionario de variables que se quieren imprimir en el log
-
-        :Authors:
-            - Pablo Contreras
-
-        :Created:
-            - 2022-12-24
-        """
-        if self.debug:
-            self.default('DEBUG', message, traceback, extra)
-
-    def default(self, level, message, traceback=None, extra={}):
-        """
-        Formato general de prints.
-
-        Parameters
-        ----------
-        level : str
-            Indica el tipo de log a imprimir
-        message : str
-            Texto a imprimir como log
-        traceback : str
-            Texto correspondiente al traceback
-        extra : dict
-            Diccionario de variables que se quieren imprimir en el log
-
-        :Authors:
-            - Pablo Contreras
-
-        :Created:
-            - 2022-12-24
-        """
-        date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        message = f'[{date}][{level}] {message}'
-        if extra != {}:
-            message += f' {json_dumps(extra, default=str)}'
-        if traceback is not None:
-            message += f' {traceback}'
-        print(
-            LEVEL[level],
-            message,
-            END
-        )
+            while True:
+                key = input().lower()
+                if key == 'n' and page < total_pages:
+                    page += 1
+                    self.print_logs(page, page_size)
+                elif key == 'p' and page > 1:
+                    page -= 1
+                    self.print_logs(page, page_size)
+                else:
+                    break
