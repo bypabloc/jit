@@ -207,6 +207,3 @@ pyrightconfig.json
 build
 .venv
 .venv_tmp
-
-*.pyc
-.pyo
