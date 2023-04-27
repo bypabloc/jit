@@ -12,7 +12,7 @@ path_script_abs=$(dirname "$(realpath "$path_script")")
 # Ruta relativa del comando al directorio desde donde se llama el script
 path_script_rel=$(realpath --relative-to="$path_caller" "$path_script_abs")
 
-function byte-me() {
+function jit() {
     # Ejecuta el script de python pasándole los argumentos
     python3 "$path_script_abs/run.py" ${@:1}
 }
