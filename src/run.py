@@ -27,16 +27,10 @@ def main():
     )
 
     parser.add_argument(
-        "-N",
-        "--name",
+        "-c",
+        "--command",
         required=True,
-        help="Nombre de la persona",
-    )
-    parser.add_argument(
-        "-L",
-        "--lastname",
-        required=True,
-        help="Apellido de la persona",
+        help="Comando a ejecutar",
     )
 
     try:
@@ -47,8 +41,7 @@ def main():
         print("Se encontró un error al procesar los argumentos.")
         sys_exit(e.code)
 
-    print(f"Nombre: {args.name}")
-    print(f"Apellido: {args.lastname}")
+    print(f"command: {args.command}")
 
     questions = [
         inquirer_Text(
