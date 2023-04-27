@@ -1,17 +1,34 @@
-# [Tema o componente] Resumen de una línea del cambio (50 caracteres como máximo)
+- [Component] Resumen de una línea del cambio (50 caracteres como máximo)
 
-# Más detalles sobre el cambio, explicando la motivación, enfoque y efectos
-# (envuelve el texto a ~72 caracteres por línea)
-#
-# - Usa una lista con viñetas si es necesario
-# - Explica cualquier cambio importante en la implementación o diseño
-# - Menciona cualquier problema que se haya resuelto o mejorado
-#
-# Enlace a issue/ticket en el sistema de seguimiento de problemas (si corresponde)
-# Ejemplo: Resuelve: #123, Relacionado con: #456
-#
-# <tipo>(<alcance>): <asunto>
-# <BLANK LINE>
-# <cuerpo>
-# <BLANK LINE>
-# <pie>
+Más detalles sobre el cambio, explicando la motivación, enfoque y efectos
+(envuelve el texto a ~72 caracteres por línea)
+
+- Usa una lista con viñetas si es necesario
+- Explica cualquier cambio importante en la implementación o diseño
+- Menciona cualquier problema que se haya resuelto o mejorado
+
+Enlace a issue/ticket en el sistema de seguimiento de problemas (si corresponde)
+Ejemplo: Resuelve: #123, Relacionado con: #456
+
+<type>(<range>): <subject>
+
+<body>
+
+<footer>
+
+# Ejemplo:
+# Refactoriza el módulo de autenticación para mejorar la seguridad
+# 
+# Este commit aborda las preocupaciones de seguridad en el módulo de
+# autenticación al:
+# - Cambiar el algoritmo de hashing de contraseñas a bcrypt
+# - Eliminar el almacenamiento en caché de contraseñas en texto claro
+# - Agregar la función de bloqueo de cuenta después de múltiples intentos fallidos
+# 
+# Estos cambios mejoran significativamente la seguridad del sistema y reducen
+# el riesgo de ataques de fuerza bruta.
+# 
+# Resuelve: #42
+# Relacionado con: #37
+# 
+# refactor(autenticación): mejora seguridad en el módulo -->

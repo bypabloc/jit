@@ -7,6 +7,11 @@ source .venv/bin/activate
 pip install -r requirements
 ```
 
+## Config git
+```
+git config --local commit.template .gitmessage
+```
+
 # Install
 
 # Permission
