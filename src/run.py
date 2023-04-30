@@ -1,11 +1,8 @@
 from argparse import ArgumentParser as argparse_ArgumentParser
-from re import match as re_match
 from sys import exit as sys_exit
 from sys import stderr as sys_stderr
 from traceback import format_exc
 
-from inquirer import Text as inquirer_Text
-from inquirer import prompt as inquirer_prompt
 from settings.logger import logger
 from utils.import_all_modules_from_folder import import_all_modules_from_folder
 from utils.import_module_dynamically import import_module_dynamically
@@ -38,6 +35,7 @@ def main():
     )
 
     try:
+        # allow other args to be passed to the script
         args = parser.parse_args()
     except SystemExit as e:
         # En este punto, puedes manejar el error de la forma que desees.
@@ -50,6 +48,8 @@ def main():
     modules = import_all_modules_from_folder(directory=path_commands)
 
     command = args.command
+
+    del args.command
 
     if command not in modules:
         logger.info(f"El comando '{command}' no existe.")
@@ -67,21 +67,6 @@ def main():
     instancia_de_clase = imported_class(args=vars(args))
     execute = getattr(instancia_de_clase, "execute")
     execute()
-
-    # questions = [
-    #     inquirer_Text(
-    #         "name",
-    #         message="What's your name",
-    #     ),
-    #     inquirer_Text("surname", message="What's your surname"),
-    #     inquirer_Text(
-    #         "phone",
-    #         message="What's your phone number",
-    #         validate=lambda _, x: re_match("\+?\d[\d ]+\d", x),
-    #     ),
-    # ]
-    # answers = inquirer_prompt(questions)
-    # print(answers)
 
 
 if __name__ == "__main__":

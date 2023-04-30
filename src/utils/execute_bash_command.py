@@ -1,22 +1,21 @@
 import subprocess
 
-from app.utils.custom_exception import CustomException
-from app.settings.config import logger
+from settings.logger import logger
 
 
-def execute_bash_command(command: str) -> None:
+def execute_bash_command(params: dict):
     """Execute bash command"""
-    process = subprocess.Popen(
-        command.split(),
-        stdout=subprocess.PIPE,
-        text=True,
-    )
-    output, error = process.communicate()
-    if error:
-        logger.error('Error', extra={'error': error})
-        raise CustomException(
-            message='ERROR',
-            message_type='ERROR',
-            status_code=500,
-        )
-    return output
+    logger.info("Ejecutando comando 'execute_bash_command'.")
+    logger.info(f"Argumentos: {params}")
+
+    args = []
+    for key, value in params.items():
+        args.append(f"-{key}")
+        if value is not None:
+            args.append(value)
+
+    process = subprocess.run(["ssh-keygen", "-t", "ed25519", "-C", email, "-f", output_file], check=True)
+    if not process:
+        logger.error("Error al ejecutar el comando 'ssh-keygen'.")
+        return
+    return process

@@ -1,12 +1,7 @@
 import os
 
-from settings.logger import logger
-
 
 def import_all_modules_from_folder(directory: str) -> list:
-
-    logger.info(f"Importing all modules from folder '{directory}'")
-
     current_file_dir = os.path.dirname(os.path.realpath(__file__))
     root_dir = os.path.dirname(current_file_dir)
     directory_path = os.path.join(root_dir, directory)
