@@ -60,10 +60,10 @@ class Validator:
         current[keys[-1]].append(error_message)
 
     def __validate_value(self, value, schema, path, root_type=None):
-        data_types = schema.get("type", root_type)
-
-        if not isinstance(data_types, list):
-            data_types = [data_types]
+        data_type = schema.get("type", root_type)
+        if not isinstance(data_type, str):
+            self.__add_error(path, f"Should be of type 'string', but got '{type(data_type).__name__}'")
+            return False
 
         validators = {
             "string": self.__validate_string,
@@ -74,43 +74,51 @@ class Validator:
             "boolean": self.__validate_boolean,
         }
 
-        valid = False
-        error_messages = []
-        for data_type in data_types:
-            validator = validators.get(data_type)
-            if not validator:
-                error_messages.append(f"Unknown data type '{data_types}'")
-            else:
-                valid = validator(value, schema, path, check_only=True)
-
-            if valid:
-                break
-
-        if not valid:
-            for error_message in error_messages:
-                self.__add_error(path, error_message)
-
-    def __validate_object(self, obj, schema, path="", check_only=False):
-        if schema["type"] == "object":
-            for key, prop_schema in schema["properties"].items():
-                if key in obj:
-                    self.__validate_value(obj[key], prop_schema, f"{path}.{key}" if path else key)
-                elif "default" in prop_schema:
-                    obj[key] = prop_schema["default"]
-                elif "required" in schema and key in schema["required"]:
-                    self.__add_error(f"{path}.{key}", "Required property is missing")
-
-    def __validate_boolean(self, value, schema, path, check_only=False):
-        if not isinstance(value, bool):
-            if check_only:
-                self.__add_error(path, "should be a boolean")
+        validator = validators.get(data_type)
+        if not validator:
+            self.__add_error(path, f"Unknown data type '{data_type}'")
+            return False
+        is_valid = validator(value, schema, path)
+        if not is_valid:
             return False
         return True
 
-    def __validate_string(self, value, schema, path, check_only=False):
+    def __validate_object(self, obj, schema, path="") -> bool:
+        if not isinstance(obj, dict):
+            self.__add_error(path, f"should be of type 'object', but got '{type(obj).__name__}'")
+            return False
+
+        is_valid = True
+        properties = schema.get("properties", {})
+        for key, prop_schema in properties.items():
+            value = obj.get(key)
+            required = prop_schema.get("required")
+            default = prop_schema.get("default")
+            if required and value is None:
+                self.__add_error(key, "Required property is missing")
+                continue
+            if key in obj:
+                if default and value is None:
+                    obj[key] = default
+                    value = default
+                if value is None:
+                    self.__add_error(key, "Required property is missing")
+                    continue
+                validated = self.__validate_value(obj[key], prop_schema, f"{path}.{key}" if path else key)
+                if not validated and is_valid:
+                    is_valid = False
+
+        return is_valid
+
+    def __validate_boolean(self, value, schema, path):
+        if not isinstance(value, bool):
+            self.__add_error(path, "should be a boolean")
+            return False
+        return True
+
+    def __validate_string(self, value, schema, path):
         if not isinstance(value, str):
-            if check_only:
-                self.__add_error(path, f"should be of type 'string', but got '{type(value).__name__}'")
+            self.__add_error(path, f"should be of type 'string', but got '{type(value).__name__}'")
             return False
 
         if "minLength" in schema and len(value) < schema["minLength"]:
@@ -215,10 +223,9 @@ class Validator:
         except re_error:
             return False
 
-    def __validate_number(self, value, schema, path, check_only=False):
+    def __validate_number(self, value, schema, path):
         if not isinstance(value, (int, float)):
-            if check_only:
-                self.__add_error(path, f"should be of type 'number', but got '{type(value).__name__}'")
+            self.__add_error(path, f"should be of type 'number', but got '{type(value).__name__}'")
             return False
 
         if "minimum" in schema and value < schema["minimum"]:
@@ -228,10 +235,9 @@ class Validator:
             self.__add_error(path, f"should be less than or equal to {schema['maximum']}")
         return True
 
-    def __validate_integer(self, value, schema, path, check_only=False):
+    def __validate_integer(self, value, schema, path):
         if not isinstance(value, (int, str, float)):
-            if check_only:
-                self.__add_error(path, f"should be of type 'integer', but got '{type(value).__name__}'")
+            self.__add_error(path, f"should be of type 'integer', but got '{type(value).__name__}'")
             return False
 
         if isinstance(value, str):
@@ -257,10 +263,9 @@ class Validator:
             self.__add_error(path, f"should be less than or equal to {schema['maximum']}")
         return True
 
-    def __validate_array(self, value, schema, path, check_only=False):
+    def __validate_array(self, value, schema, path):
         if not isinstance(value, list):
-            if check_only:
-                self.__add_error(path, f"should be of type 'array', but got '{type(value).__name__}'")
+            self.__add_error(path, f"should be of type 'array', but got '{type(value).__name__}'")
             return False
 
         if "minItems" in schema and len(value) < schema["minItems"]:
@@ -286,7 +291,8 @@ if __name__ == "__main__":
                 "description": "Name of the employee",
                 "type": "string",
                 "minLength": 3,
-                "maxLength": 20
+                "maxLength": 20,
+                "required": True
             },
             "age": {
                 "description": "Age of the employee",
@@ -297,7 +303,8 @@ if __name__ == "__main__":
             "email": {
                 "description": "Email address of the employee",
                 "type": "string",
-                "format": "email"
+                "format": "email",
+                "required": True
             },
             "cellphone": {
                 "description": "Cellphone number of the employee",
@@ -330,7 +337,7 @@ if __name__ == "__main__":
             },
             "salary": {
                 "description": "Salary of the employee",
-                "type": ["number", "string"],
+                "type": "number",
                 "minimum": 1000,
                 "maximum": 10000
             },
@@ -369,7 +376,6 @@ if __name__ == "__main__":
                         "default": True
                     }
                 },
-                "required": ["postalCode", "street", "city"]
             },
             "projects": {
                 "description": "Projects the employee has worked on",
@@ -385,16 +391,14 @@ if __name__ == "__main__":
                             "format": "duration"
                         }
                     },
-                    "required": ["name", "duration"]
                 }
             }
         },
-        "required": ["name", "email", "age", "address"]
     }
 
     # Ejemplo de un objeto válido
     valid_data = {
-        "name": "John Doe",
+        "name": "John Doe Jr.",
         "email": "john.doe@example.com",
         "age": 30,
         "cellphone": "(888)555-1212",
@@ -402,7 +406,7 @@ if __name__ == "__main__":
         "birthDateTime": "1990-05-01T08:30:00Z",
         "birthTime": "08:30:00",
         "duration": "P1Y2M10DT2H30M",
-        "salary": 5000,
+        "salary": 5000.0,
         "contactNo": [
             "+1 234-567-8910"
         ],
@@ -427,7 +431,6 @@ if __name__ == "__main__":
 
     # Ejemplo de un objeto inválido
     invalid_data = {
-        "name": "JD",
         "email": "john.doe@example",
         "age": 25.5,
         "cellphone": "(800)FLOWERS",
