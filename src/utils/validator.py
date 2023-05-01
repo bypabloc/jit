@@ -1,12 +1,38 @@
-from datetime import datetime
 from re import compile as re_compile
 from re import error as re_error
+from re import escape as re_escape
 from re import match as re_match
 
 
 class Validator:
     _schema: dict = None
     _errors: dict = None
+
+    DATETIME_FORMATS = {
+        'DATE': {
+            '%b': r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)",  # Abreviatura del mes (3 caracteres)
+            '%d': r"(0[1-9]|[12][0-9]|3[01])",                           # Día del mes (01-31)
+            '%Y': r"\d{4}",                                              # Año en formato de 4 dígitos
+            '%a': r"(Mon|Tue|Wed|Thu|Fri|Sat|Sun)",                      # Abreviatura del día de la semana (3 caracteres)
+            '%A': r"(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)",  # Nombre completo del día de la semana
+            '%B': r"(January|February|March|April|May|June|July|August|September|October|November|December)",  # Nombre completo del mes
+            '%w': r"[0-6]",                                              # Día de la semana como número (0-6, domingo=0)
+            '%m': r"(0[1-9]|1[012])",                                    # Mes como número (01-12)
+            '%y': r"\d{2}",                                              # Año en formato de 2 dígitos (sin siglo)
+            '%j': r"(00[1-9]|0[1-9]\d|[12]\d{2}|3[0-5]\d|366)",          # Número del día en el año (001-366)
+            '%W': r"(0[0-9]|[1-4][0-9]|5[0-3])",                         # Número de la semana del año (00-53, lunes=primer día)
+            '%U': r"(0[0-9]|[1-4][0-9]|5[0-3])",                         # Número de la semana del año (00-53, domingo=primer día)
+        },
+        'TIME': {
+            '%H': r"([01]\d|2[0-3])",                                    # Hora (00-23)
+            '%M': r"([0-5]\d)",                                          # Minuto (00-59)
+            '%S': r"([0-5]\d)",                                          # Segundo (00-59)
+            '%p': r"(AM|PM)",                                            # AM/PM para la hora
+            '%f': r"\d{6}",                                              # Micro segundo (000000-999999)
+            '%Z': r"[A-Z]{3}",                                           # Zona horaria (ejemplo: CST)
+            '%z': r"[+-]\d{4}",                                          # Desplazamiento UTC (ejemplo: +0600)
+        },
+    }
 
     def __init__(self, schema):
         self._schema = schema
@@ -108,8 +134,9 @@ class Validator:
             format_validator = format_validators.get(schema["format"])
             if not format_validator:
                 self.__add_error(path, f"Unknown format '{schema['format']}'")
-            validated = format_validator(value=value, path=path, format_custom=schema.get("format-custom"))
+            validated, error_message = format_validator(value=value)
             if not validated:
+                self.__add_error(path, error_message)
                 return False
 
         if "pattern" in schema:
@@ -122,64 +149,61 @@ class Validator:
                 return False
         return True
 
-    def __validate_string_email(self, value, path, **kwargs):
+    def __validate_string_email(self, value):
         email_regex = r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)"
-        matched = re_match(email_regex, value)
-        if not matched:
-            self.__add_error(path, "should be a valid email address")
-            return False
-        return True
+        is_valid = re_match(email_regex, value)
+        if not is_valid:
+            return False, "should be a valid email address"
+        return True, ""
 
-    def __validate_string_uri(self, value, path, **kwargs):
+    def __validate_string_uri(self, value):
         uri_regex = r"(?i)\b((?:[a-z][\w-]+:(?:\/{1,3}|[a-z0-9%])|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}\/)(?:[^\s()<>]+|\((?:[^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\((?:[^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'\".,<>?«»“”‘’$]))"
-        matched = re_match(uri_regex, value)
-        if not matched:
-            self.__add_error(path, "should be a valid URI")
-            return False
-        return True
+        is_valid = re_match(uri_regex, value)
+        if not is_valid:
+            return False, "should be a valid URI"
+        return True, ""
 
-    def __validate_string_date(self, value, path, **kwargs):
-        format_custom = kwargs.get("format_custom")
-        if format_custom:
-            try:
-                datetime.strptime(value, format_custom)
-                return True
-            except ValueError:
-                self.__add_error(path, f"Should match the format '{format_custom}'")
-                return False
-        date_formats = ["%Y-%m-%d", "%d-%m-%Y", "%m-%d-%Y"]
-        for date_format in date_formats:
-            try:
-                datetime.strptime(value, date_format)
-                return True
-            except ValueError:
-                continue
-        self.__add_error(path, f"Should match the format '{date_formats}'")
-        return False
+    def __validate_string_date(self, value):
+        date_format_mapping = self.DATETIME_FORMATS.get('DATE', {})
+        format_mapping = {**date_format_mapping}
+        regex = "^" + "".join([format_mapping.get(char, re_escape(char)) for char in value]) + "$"
+        is_valid = re_match(regex, value)
+        if not is_valid:
+            return False, "Should be a valid date"
+        return True, ""
 
-    def __validate_string_datetime(self, value, path, **kwargs):
-        date_time_format = "%Y-%m-%dT%H:%M:%SZ"
-        try:
-            datetime.strptime(value, date_time_format)
-            return True
-        except ValueError:
-            return False
+    def __validate_string_datetime(self, value):
+        date_format_mapping = self.DATETIME_FORMATS.get('DATE', {})
+        time_format_mapping = self.DATETIME_FORMATS.get('TIME', {})
+        format_mapping = {**date_format_mapping, **time_format_mapping}
+        regex = "^" + "".join([format_mapping.get(char, re_escape(char)) for char in value]) + "$"
+        is_valid = re_match(regex, value)
+        if not is_valid:
+            return False, "Should be a valid datetime"
+        return True, ""
 
-    def __validate_string_time(self, value, path, **kwargs):
-        time_format = "%H:%M:%S"
-        try:
-            datetime.strptime(value, time_format)
-            return True
-        except ValueError:
-            return False
+    def __validate_string_time(self, value):
+        time_format_mapping = self.DATETIME_FORMATS.get('TIME', {})
+        format_mapping = {**time_format_mapping}
+        regex = "^" + "".join([format_mapping.get(char, re_escape(char)) for char in value]) + "$"
+        is_valid = re_match(regex, value)
+        if not is_valid:
+            return False, "Should be a valid time"
+        return True, ""
 
-    def __validate_string_duration(self, value, path, **kwargs):
+    def __validate_string_duration(self, value):
         duration_regex = r"^P(?=\d|T\d)(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)([DW]))?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d{1,9})?)S)?)?$"
-        return re_match(duration_regex, value) is not None
+        is_valid = re_match(duration_regex, value)
+        if not is_valid:
+            return False, "should be a valid duration"
+        return True, ""
 
-    def __validate_string_uuid_v4(self, value, path, **kwargs):
+    def __validate_string_uuid_v4(self, value):
         uuid_regex = r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
-        return re_match(uuid_regex, value) is not None
+        is_valid = re_match(uuid_regex, value)
+        if not is_valid:
+            return False, "should be a valid UUIDv4"
+        return True, ""
 
     def __validate_pattern(self, pattern, value):
         return re_match(pattern, value) is not None
@@ -286,8 +310,7 @@ if __name__ == "__main__":
                 "format": "date",
                 "default": "2016-01-01",
                 "min": "1900-01-01",
-                "max": "2016-01-01",
-                "format-custom": "%Y-%m-%d"
+                "max": "2016-01-01"
             },
             "birthDateTime": {
                 "description": "Birth date and time of the employee",
