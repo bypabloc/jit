@@ -3,9 +3,6 @@ from re import compile as re_compile
 from re import error as re_error
 from re import match as re_match
 
-from idna import IDNAError as idna_IDNAError
-from idna import decode as idna_decode
-
 
 class Validator:
     _schema: dict = None
@@ -79,27 +76,28 @@ class Validator:
 
     def __validate_boolean(self, value, schema, path, check_only=False):
         if not isinstance(value, bool):
-            if not check_only:
+            if check_only:
                 self.__add_error(path, "should be a boolean")
             return False
         return True
 
     def __validate_string(self, value, schema, path, check_only=False):
         if not isinstance(value, str):
-            if not check_only:
+            if check_only:
                 self.__add_error(path, f"should be of type 'string', but got '{type(value).__name__}'")
             return False
 
         if "minLength" in schema and len(value) < schema["minLength"]:
             self.__add_error(path, f"should have a minimum length of {schema['minLength']}")
+            return False
 
         if "maxLength" in schema and len(value) > schema["maxLength"]:
             self.__add_error(path, f"should have a maximum length of {schema['maxLength']}")
+            return False
 
         if "format" in schema:
             format_validators = {
                 "email": self.__validate_string_email,
-                "idn-email": self.__validate_string_idn_email,
                 "uri": self.__validate_string_uri,
                 "date": self.__validate_string_date,
                 "datetime": self.__validate_string_datetime,
@@ -110,20 +108,92 @@ class Validator:
             format_validator = format_validators.get(schema["format"])
             if not format_validator:
                 self.__add_error(path, f"Unknown format '{schema['format']}'")
-            elif format_validator and not format_validator(value):
-                self.__add_error(path, f"should match the format '{schema['format']}'")
+            validated = format_validator(value=value, path=path, format_custom=schema.get("format-custom"))
+            if not validated:
+                return False
 
         if "pattern" in schema:
             pattern = schema["pattern"]
             if not self.__is_valid_regex(pattern):
                 self.__add_error(path, f"Invalid regular expression '{pattern}'")
+                return False
             if not self.__validate_pattern(pattern, value):
                 self.__add_error(path, f"Value '{value}' does not match pattern '{pattern}'")
+                return False
         return True
+
+    def __validate_string_email(self, value, path, **kwargs):
+        email_regex = r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)"
+        matched = re_match(email_regex, value)
+        if not matched:
+            self.__add_error(path, "should be a valid email address")
+            return False
+        return True
+
+    def __validate_string_uri(self, value, path, **kwargs):
+        uri_regex = r"(?i)\b((?:[a-z][\w-]+:(?:\/{1,3}|[a-z0-9%])|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}\/)(?:[^\s()<>]+|\((?:[^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\((?:[^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'\".,<>?«»“”‘’$]))"
+        matched = re_match(uri_regex, value)
+        if not matched:
+            self.__add_error(path, "should be a valid URI")
+            return False
+        return True
+
+    def __validate_string_date(self, value, path, **kwargs):
+        format_custom = kwargs.get("format_custom")
+        if format_custom:
+            try:
+                datetime.strptime(value, format_custom)
+                return True
+            except ValueError:
+                self.__add_error(path, f"Should match the format '{format_custom}'")
+                return False
+        date_formats = ["%Y-%m-%d", "%d-%m-%Y", "%m-%d-%Y"]
+        for date_format in date_formats:
+            try:
+                datetime.strptime(value, date_format)
+                return True
+            except ValueError:
+                continue
+        self.__add_error(path, f"Should match the format '{date_formats}'")
+        return False
+
+    def __validate_string_datetime(self, value, path, **kwargs):
+        date_time_format = "%Y-%m-%dT%H:%M:%SZ"
+        try:
+            datetime.strptime(value, date_time_format)
+            return True
+        except ValueError:
+            return False
+
+    def __validate_string_time(self, value, path, **kwargs):
+        time_format = "%H:%M:%S"
+        try:
+            datetime.strptime(value, time_format)
+            return True
+        except ValueError:
+            return False
+
+    def __validate_string_duration(self, value, path, **kwargs):
+        duration_regex = r"^P(?=\d|T\d)(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)([DW]))?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d{1,9})?)S)?)?$"
+        return re_match(duration_regex, value) is not None
+
+    def __validate_string_uuid_v4(self, value, path, **kwargs):
+        uuid_regex = r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+        return re_match(uuid_regex, value) is not None
+
+    def __validate_pattern(self, pattern, value):
+        return re_match(pattern, value) is not None
+
+    def __is_valid_regex(self, regex):
+        try:
+            re_compile(regex)
+            return True
+        except re_error:
+            return False
 
     def __validate_number(self, value, schema, path, check_only=False):
         if not isinstance(value, (int, float)):
-            if not check_only:
+            if check_only:
                 self.__add_error(path, f"should be of type 'number', but got '{type(value).__name__}'")
             return False
 
@@ -135,13 +205,23 @@ class Validator:
         return True
 
     def __validate_integer(self, value, schema, path, check_only=False):
-        if not isinstance(value, int):
-            if not check_only:
+        if not isinstance(value, (int, str, float)):
+            if check_only:
                 self.__add_error(path, f"should be of type 'integer', but got '{type(value).__name__}'")
             return False
 
-        if not value.is_integer():
-            self.__add_error(path, "should be an integer")
+        if isinstance(value, str):
+            try:
+                value = float(value)
+            except ValueError:
+                self.__add_error(path, f"should be of type 'integer', but got '{type(value).__name__}'")
+                return False
+
+        if isinstance(value, float):
+            if not value.is_integer():
+                self.__add_error(path, "should be an integer")
+                return False
+            value = int(value)
 
         if "multipleOf" in schema and value % schema["multipleOf"] != 0:
             self.__add_error(path, f"should be a multiple of {schema['multipleOf']}")
@@ -155,7 +235,7 @@ class Validator:
 
     def __validate_array(self, value, schema, path, check_only=False):
         if not isinstance(value, list):
-            if not check_only:
+            if check_only:
                 self.__add_error(path, f"should be of type 'array', but got '{type(value).__name__}'")
             return False
 
@@ -169,69 +249,6 @@ class Validator:
             for idx, item in enumerate(value):
                 self.__validate_value(item, schema["items"], f"{path}[{idx}]")
         return True
-
-    def __validate_string_email(self, value):
-        email_regex = r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)"
-        return re_match(email_regex, value) is not None
-
-    def __validate_string_idn_email(self, value):
-        email_regex = r"^(.+)@([^\s@]+)$"
-        match = re_match(email_regex, value)
-        if not match:
-            return False
-
-        _, domain_part = match.groups()
-        try:
-            domain_part = idna_decode(domain_part)
-            return True
-        except idna_IDNAError:
-            return False
-
-    def __validate_string_uri(self, value):
-        uri_regex = r"(?i)\b((?:[a-z][\w-]+:(?:\/{1,3}|[a-z0-9%])|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}\/)(?:[^\s()<>]+|\((?:[^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\((?:[^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'\".,<>?«»“”‘’$]))"
-        return re_match(uri_regex, value) is not None
-
-    def __validate_string_date(self, value):
-        date_format = "%Y-%m-%d"
-        try:
-            datetime.strptime(value, date_format)
-            return True
-        except ValueError:
-            return False
-
-    def __validate_string_datetime(self, value):
-        date_time_format = "%Y-%m-%dT%H:%M:%SZ"
-        try:
-            datetime.strptime(value, date_time_format)
-            return True
-        except ValueError:
-            return False
-
-    def __validate_string_time(self, value):
-        time_format = "%H:%M:%S"
-        try:
-            datetime.strptime(value, time_format)
-            return True
-        except ValueError:
-            return False
-
-    def __validate_string_duration(self, value):
-        duration_regex = r"^P(?=\d|T\d)(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)([DW]))?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d{1,9})?)S)?)?$"
-        return re_match(duration_regex, value) is not None
-
-    def __validate_string_uuid_v4(self, value):
-        uuid_regex = r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
-        return re_match(uuid_regex, value) is not None
-
-    def __validate_pattern(self, pattern, value):
-        return re_match(pattern, value) is not None
-    
-    def __is_valid_regex(self, regex):
-        try:
-            re_compile(regex)
-            return True
-        except re_error:
-            return False
 
 
 if __name__ == "__main__":
@@ -263,15 +280,14 @@ if __name__ == "__main__":
                 "type": "string",
                 "pattern": "^(\\([0-9]{3}\\))?[0-9]{3}-[0-9]{4}$"
             },
-            "idnEmail": {
-                "description": "Internationalized email address of the employee",
-                "type": "string",
-                "format": "idn-email"
-            },
             "birthDate": {
                 "description": "Birth date of the employee",
                 "type": "string",
-                "format": "date"
+                "format": "date",
+                "default": "2016-01-01",
+                "min": "1900-01-01",
+                "max": "2016-01-01",
+                "format-custom": "%Y-%m-%d"
             },
             "birthDateTime": {
                 "description": "Birth date and time of the employee",
@@ -288,12 +304,6 @@ if __name__ == "__main__":
                 "description": "Duration of the employee's contract",
                 "type": "string",
                 "format": "duration"
-            },
-            "age": {
-                "description": "Age of the employee",
-                "type": "number",
-                "minimum": 18,
-                "maximum": 60
             },
             "salary": {
                 "description": "Salary of the employee",
@@ -365,12 +375,10 @@ if __name__ == "__main__":
         "email": "john.doe@example.com",
         "age": 30,
         "cellphone": "(888)555-1212",
-        "idnEmail": "张伟@邮件.中国",
         "birthDate": "1990-05-01",
         "birthDateTime": "1990-05-01T08:30:00Z",
         "birthTime": "08:30:00",
         "duration": "P1Y2M10DT2H30M",
-        "age": 33,
         "salary": 5000,
         "contactNo": [
             "+1 234-567-8910"
@@ -400,7 +408,6 @@ if __name__ == "__main__":
         "email": "john.doe@example",
         "age": 25.5,
         "cellphone": "(800)FLOWERS",
-        "idnEmail": "john.doe@exämple.com",
         "birthDate": "1990/05/01",
         "birthDateTime": "1990-05-01 08:30:00",
         "birthTime": "083000",
