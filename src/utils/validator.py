@@ -43,7 +43,7 @@ class Validator:
         self.__validate_value(data, self._schema, "", root_type)
 
     def is_valid(self):
-        return len(self._errors) == 0
+        return bool(self.errors)
 
     def get_errors(self):
         return self._errors
@@ -52,12 +52,32 @@ class Validator:
         keys = path.split(".")
         current = self._errors
         for key in keys[:-1]:
-            if key not in current:
-                current[key] = {}
-            current = current[key]
-        if keys[-1] not in current:
-            current[keys[-1]] = []
-        current[keys[-1]].append(error_message)
+            if key.endswith(']'):
+                index = int(key[key.index('[') + 1:key.index(']')])
+                key = key[:key.index('[')]
+                if key not in current:
+                    current[key] = []
+                while len(current[key]) <= index:
+                    current[key].append({})
+                current = current[key][index]
+            else:
+                if key not in current:
+                    current[key] = {}
+                current = current[key]
+
+        last_key = keys[-1]
+        if last_key.endswith(']'):
+            index = int(last_key[last_key.index('[') + 1:last_key.index(']')])
+            last_key = last_key[:last_key.index('[')]
+            if last_key not in current:
+                current[last_key] = []
+            while len(current[last_key]) <= index:
+                current[last_key].append(None)  # Change here: Use None instead of []
+            current[last_key][index] = error_message  # Change here: Assign the error_message directly
+        else:
+            if last_key not in current:
+                current[last_key] = []
+            current[last_key].append(error_message)
 
     def __validate_value(self, value, schema, path, root_type=None):
         data_type = schema.get("type", root_type)
@@ -81,15 +101,16 @@ class Validator:
         is_valid = validator(value, schema, path)
         if not is_valid:
             return False
-        return True
+        return value
 
-    def __validate_object(self, obj, schema, path="") -> bool:
+    def __validate_object(self, obj, schema, path=""):
         if not isinstance(obj, dict):
             self.__add_error(path, f"should be of type 'object', but got '{type(obj).__name__}'")
             return False
 
         is_valid = True
         properties = schema.get("properties", {})
+        additional_properties = schema.get("additionalProperties", True)
         for key, prop_schema in properties.items():
             value = obj.get(key)
             required = prop_schema.get("required")
@@ -107,6 +128,13 @@ class Validator:
                 validated = self.__validate_value(obj[key], prop_schema, f"{path}.{key}" if path else key)
                 if not validated and is_valid:
                     is_valid = False
+
+        if not additional_properties:
+            extra_keys = set(obj.keys()) - set(properties.keys())
+            if extra_keys:
+                for key in extra_keys:
+                    self.__add_error(path, f"Additional property '{key}' not allowed")
+                is_valid = False
 
         return is_valid
 
@@ -270,14 +298,39 @@ class Validator:
 
         if "minItems" in schema and len(value) < schema["minItems"]:
             self.__add_error(path, f"should have at least {schema['minItems']} items")
+            return False
 
         if "uniqueItems" in schema and schema["uniqueItems"] and len(value) != len(set(value)):
             self.__add_error(path, "should have unique items")
+            return False
 
-        if "items" in schema:
-            for idx, item in enumerate(value):
-                self.__validate_value(item, schema["items"], f"{path}[{idx}]")
-        return True
+        allow_empty_value = schema.get('allowEmptyValue', True)
+        allowed_values = schema.get('allowedValues', [])
+        default_value = schema.get('default')
+        not_allowed_values = schema.get('notAllowedValues', [])
+
+        is_valid = True
+        result = []
+        for index, item in enumerate(value):
+            item_schema = schema['items']
+            validated_item = self.__validate_value(item, item_schema, path)
+
+            if allow_empty_value or validated_item != '':
+                result.append(validated_item)
+                is_valid = False if is_valid else is_valid
+
+            if allowed_values and validated_item not in allowed_values:
+                self.__add_error(path, f"Value should be one of {allowed_values}")
+                is_valid = False if is_valid else is_valid
+
+            if not_allowed_values and validated_item in not_allowed_values:
+                self.__add_error(path, f"Value {validated_item} is not allowed")
+                is_valid = False if is_valid else is_valid
+
+            if default_value is not None and validated_item is None:
+                result[-1] = default_value
+
+        return is_valid
 
 
 if __name__ == "__main__":
@@ -349,6 +402,10 @@ if __name__ == "__main__":
                     "pattern": "^\\+?\\d{1,4}?[-.\\s]?\\(?\\d{1,3}?\\)?[-.\\s]?\\d{1,4}[-.\\s]?\\d{1,4}[-.\\s]?\\d{1,9}$"
                 },
                 "minItems": 1,
+                "allowEmptyValue": False,
+                "allowedValues": ["+60123456789", "+6012-345-6789"],
+                "notAllowedValues": ["+60123456781", "+6012-345-6782"],
+                "default": ["+60123456789"],
                 "uniqueItems": True
             },
             "address": {
@@ -374,6 +431,12 @@ if __name__ == "__main__":
                     "isPrimary": {
                         "type": "boolean",
                         "default": True
+                    },
+                    "referencies": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
                     }
                 },
             },
@@ -394,6 +457,7 @@ if __name__ == "__main__":
                 }
             }
         },
+        "additionalProperties": False,
     }
 
     # Ejemplo de un objeto válido
@@ -408,14 +472,18 @@ if __name__ == "__main__":
         "duration": "P1Y2M10DT2H30M",
         "salary": 5000.0,
         "contactNo": [
-            "+1 234-567-8910"
+            "+60123456789"
         ],
         "address": {
             "postalCode": "12345",
             "street": "123 Main Street Apt 4 Las Altas",
             "city": "New York",
             "country": "USA",
-            "isPrimary": True
+            "isPrimary": True,
+            "referencies": [
+                "Near the park",
+                "Beside the church"
+            ]
         },
         "projects": [
             {
