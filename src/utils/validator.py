@@ -110,15 +110,29 @@ class Validator:
 
         properties = schema.get("properties", {})
         propertyNames = schema.get("propertyNames", {})
+        properties_keys = []
         if propertyNames:
             pattern = propertyNames.get('pattern')
             if pattern:
                 regex = re_compile(pattern)
-                for key in properties.keys():
+                properties_keys = properties.keys()
+                for key in properties_keys:
                     if not regex.match(key):
                         key = f"'{key}'" if key else "''"
                         self.__add_error(key, f"Invalid property name: should match pattern {pattern}")
                         return False
+
+        minProperties = schema.get("minProperties", {})
+        if minProperties:
+            if len(properties_keys) < minProperties:
+                self.__add_error(path, f"should have at least {minProperties} properties")
+                return False
+
+        maxProperties = schema.get("maxProperties", {})
+        if maxProperties:
+            if len(properties_keys) > maxProperties:
+                self.__add_error(path, f"should have at most {maxProperties} properties")
+                return False
 
         is_valid = True
         additional_properties = schema.get("additionalProperties", True)
@@ -472,6 +486,8 @@ if __name__ == "__main__":
         "propertyNames": {
             "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
         },
+        "minProperties": 2,
+        "maxProperties": 20
     }
 
     # Ejemplo de un objeto válido
