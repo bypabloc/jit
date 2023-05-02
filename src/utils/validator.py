@@ -108,8 +108,19 @@ class Validator:
             self.__add_error(path, f"should be of type 'object', but got '{type(obj).__name__}'")
             return False
 
-        is_valid = True
         properties = schema.get("properties", {})
+        propertyNames = schema.get("propertyNames", {})
+        if propertyNames:
+            pattern = propertyNames.get('pattern')
+            if pattern:
+                regex = re_compile(pattern)
+                for key in properties.keys():
+                    if not regex.match(key):
+                        key = f"'{key}'" if key else "''"
+                        self.__add_error(key, f"Invalid property name: should match pattern {pattern}")
+                        return False
+
+        is_valid = True
         additional_properties = schema.get("additionalProperties", True)
         for key, prop_schema in properties.items():
             value = obj.get(key)
@@ -458,10 +469,14 @@ if __name__ == "__main__":
             }
         },
         "additionalProperties": False,
+        "propertyNames": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+        },
     }
 
     # Ejemplo de un objeto válido
     valid_data = {
+        "&%$%(/)(/(?¡?=^`^`name": "John Doe Jr.",
         "name": "John Doe Jr.",
         "email": "john.doe@example.com",
         "age": 30,
