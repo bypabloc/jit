@@ -200,6 +200,18 @@ class Validator:
                 self.__add_error(path, error_message)
                 return False
 
+        if "contentMediaType" in schema:
+            media_validators = {
+                "text/html": self.__validate_string_text_html,
+            }
+            media_validator = media_validators.get(schema["contentMediaType"])
+            if not media_validator:
+                self.__add_error(path, f"Unknown content media type '{schema['contentMediaType']}'")
+            validated, error_message = media_validator(value=value)
+            if not validated:
+                self.__add_error(path, error_message)
+                return False
+
         if "pattern" in schema:
             pattern = schema["pattern"]
             if not self.__is_valid_regex(pattern):
@@ -209,6 +221,9 @@ class Validator:
                 self.__add_error(path, f"Value '{value}' does not match pattern '{pattern}'")
                 return False
         return True
+
+    def __validate_string_text_html(self, value):
+        return True, ""
 
     def __validate_string_email(self, value):
         email_regex = r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)"
@@ -419,6 +434,12 @@ if __name__ == "__main__":
                 "minimum": 1000,
                 "maximum": 10000
             },
+            "photo_profile": {
+                "description": "Profile of the employee",
+                "type": "string",
+                "format": "contentMediaType",
+                "contentMediaType": "image/png"
+            },
             "contactNo": {
                 "description": "Contact numbers of the employee",
                 "type": "array",
@@ -492,7 +513,6 @@ if __name__ == "__main__":
 
     # Ejemplo de un objeto válido
     valid_data = {
-        "&%$%(/)(/(?¡?=^`^`name": "John Doe Jr.",
         "name": "John Doe Jr.",
         "email": "john.doe@example.com",
         "age": 30,
